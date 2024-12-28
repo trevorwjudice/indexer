@@ -1,0 +1,5 @@
+DB_HOST: "0.0.0.0:5432"
+DB_NAME: "dev_rw"
+DB_PORT: 5432
+DB_USER: dev_rw
+DB_PW: 1234
