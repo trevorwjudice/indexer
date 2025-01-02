@@ -2,7 +2,7 @@ package indexer
 
 import (
 	"context"
-	"indexer/src/db_types"
+	"indexer/src/db/db_types"
 	"indexer/src/query"
 
 	"github.com/upper/db/v4"

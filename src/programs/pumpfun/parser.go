@@ -2,46 +2,16 @@ package pumpfun
 
 import (
 	"fmt"
-	"indexer/src/indexer"
+	"indexer/src/db/db_types"
 	"indexer/src/programs"
 	"indexer/src/util/solana/transactions"
+
+	"github.com/gagliardetto/solana-go"
 )
 
-type PumpFunInstructionParser struct{}
+var PUMPFUN_PROGRAM_ID solana.PublicKey = solana.MustPublicKeyFromBase58("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 
-var _ indexer.InstructionParser = &PumpFunInstructionParser{}
-
-func (r *PumpFunInstructionParser) ParseTransaction(reader *transactions.Reader) ([]indexer.ParsedInstruction, error) {
-	if !reader.CheckAccountKeysContains(PUMPFUN_PROGRAM_ID) {
-		// Exit early if raydium v4 program id not in transaction account keys
-		return nil, nil
-	}
-
-	flattened := reader.GetFlattenedInstructions()
-	var res []indexer.ParsedInstruction
-	for ind, inst := range flattened {
-		programId, err := reader.GetAccountAtIndex(inst.ProgramIDIndex)
-		if err != nil {
-			return nil, err
-		}
-
-		if !programId.Equals(PUMPFUN_PROGRAM_ID) {
-			continue
-		}
-
-		// In this case, the instruction is a raydium instruction, so we should parse it.
-		parsed, err := r.ParseInstruction(reader, uint8(ind))
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, parsed)
-	}
-
-	return res, nil
-}
-
-func (r *PumpFunInstructionParser) ParseInstruction(reader *transactions.Reader, flatIndex uint8) (indexer.ParsedInstruction, error) {
+func ParseInstruction(reader *transactions.Reader, flatIndex uint8, _ []db_types.ParsedInstruction) ([]db_types.ParsedInstruction, error) {
 	inst, err := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	if err != nil {
 		return nil, err
@@ -54,11 +24,29 @@ func (r *PumpFunInstructionParser) ParseInstruction(reader *transactions.Reader,
 
 	switch discriminator {
 	case InstructionCreateDiscriminator:
-		return PopulateCreate(reader, flatIndex)
+		create, err := PopulateCreate(reader, flatIndex)
+		if err != nil {
+			return nil, err
+		}
+		return []db_types.ParsedInstruction{create}, nil
 	case InstructionBuyDiscriminator:
-		return PopulateBuy(reader, flatIndex)
+		buy, err := PopulateBuy(reader, flatIndex)
+		if err != nil {
+			return nil, err
+		}
+		return []db_types.ParsedInstruction{buy}, nil
 	case InstructionSellDiscriminator:
-		return PopulateSell(reader, flatIndex)
+		sell, err := PopulateSell(reader, flatIndex)
+		if err != nil {
+			return nil, err
+		}
+		return []db_types.ParsedInstruction{sell}, nil
+	case InstructionSetParamsDiscriminator:
+		setParams, err := PopulateSetParams(reader, flatIndex)
+		if err != nil {
+			return nil, err
+		}
+		return []db_types.ParsedInstruction{setParams}, nil
 	default:
 		fmt.Println(reader.GetSignature())
 		return nil, fmt.Errorf("unknown discriminator: %d", discriminator)

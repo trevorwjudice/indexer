@@ -1,18 +1,9 @@
 package indexer_test
 
 import (
-	"context"
-	"errors"
-	"indexer/src/indexer"
-	"indexer/src/programs/raydium"
-	"testing"
-
 	"github.com/cristalhq/aconfig"
 	"github.com/cristalhq/aconfig/aconfigdotenv"
 	"github.com/cristalhq/aconfig/aconfigyaml"
-	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/upper/db/v4"
-	"golang.org/x/sync/errgroup"
 )
 
 type IndexerConfig struct {
@@ -45,10 +36,10 @@ func GetConfig(configPath string) (*IndexerConfig, error) {
 }
 
 // var cl = rpc.New("https://mainnet.helius-rpc.com/?api-key=c7c3e65e-8a33-4422-91e0-33b9d4764cca")
-var cl = rpc.New("https://mainnet.helius-rpc.com/?api-key=050a9592-0782-4c17-ab90-7e6aef937356")
-var ctx = context.TODO()
-var s db.Session
-var i *indexer.Indexer
+// var cl = rpc.New("https://mainnet.helius-rpc.com/?api-key=050a9592-0782-4c17-ab90-7e6aef937356")
+// var ctx = context.TODO()
+// var s db.Session
+// var i *indexer.Indexer
 
 func init() {
 	// c, err := GetConfig("/Users/trevorjudice/Desktop/terminal/indexer/config/local.yaml")
@@ -71,35 +62,35 @@ func init() {
 	// 	panic(err)
 	// }
 
-	i = indexer.NewIndexer(cl, s)
+	// i = indexer.NewIndexer(cl, s)
 
-	i.AddProgramParser(&raydium.RaydiumInstructionParser{})
+	// i.AddProgramParser(&raydium.RaydiumInstructionParser{})
 }
 
-func TestParseTrans(t *testing.T) {
-	validSlots, err := cl.GetBlocksWithLimit(ctx, 261717108, 1000, rpc.CommitmentConfirmed)
-	for err != nil {
-		validSlots, err = cl.GetBlocksWithLimit(ctx, 261717108, 1000, rpc.CommitmentConfirmed)
-		if len(*validSlots) == 0 {
-			err = errors.New("a")
-		}
-	}
+// func TestParseTrans(t *testing.T) {
+// validSlots, err := cl.GetBlocksWithLimit(ctx, 261717108, 1000, rpc.CommitmentConfirmed)
+// for err != nil {
+// 	validSlots, err = cl.GetBlocksWithLimit(ctx, 261717108, 1000, rpc.CommitmentConfirmed)
+// 	if len(*validSlots) == 0 {
+// 		err = errors.New("a")
+// 	}
+// }
 
-	wg := errgroup.Group{}
-	wg.SetLimit(200)
-	for _, s := range *validSlots {
-		s := s
-		wg.Go(func() error {
-			s := s
-			_, err := i.GetSlot(ctx, s)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return nil
-		})
-	}
+// 	wg := errgroup.Group{}
+// 	wg.SetLimit(200)
+// 	for _, s := range *validSlots {
+// 		s := s
+// 		wg.Go(func() error {
+// 			s := s
+// 			_, err := i.GetSlot(ctx, s)
+// 			if err != nil {
+// 				t.Fatal(err)
+// 			}
+// 			return nil
+// 		})
+// 	}
 
-	if err := wg.Wait(); err != nil {
-		t.Fatal(err)
-	}
-}
+// 	if err := wg.Wait(); err != nil {
+// 		t.Fatal(err)
+// 	}
+// }

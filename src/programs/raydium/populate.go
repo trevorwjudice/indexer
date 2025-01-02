@@ -2,7 +2,7 @@ package raydium
 
 import (
 	"fmt"
-	"indexer/src/indexer"
+	"indexer/src/db/db_types"
 	"indexer/src/programs"
 	"indexer/src/util/solana/transactions"
 
@@ -11,46 +11,46 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 )
 
-func PopulateInitialize(reader *transactions.Reader, flatIndex uint8) (s *Swap, err error) {
+func PopulateInitialize(reader *transactions.Reader, flatIndex uint8) (s *db_types.RaydiumSwap, err error) {
 	fmt.Println("initialize", reader.GetSignature())
 	panic("not implemented")
 }
 
-func PopulateInitialize2(reader *transactions.Reader, flatIndex uint8) (i *Initialize2, err error) {
+func PopulateInitialize2(reader *transactions.Reader, flatIndex uint8) (i *db_types.RaydiumInitialize2, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 21) {
 		return nil, fmt.Errorf("accounts length for MonitorStep must be either 17 or 18")
 	}
 
-	i = &Initialize2{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	i = &db_types.RaydiumInitialize2{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	i.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[4])
+	i.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[4]))
 	if err != nil {
 		return nil, err
 	}
-	i.Minter, err = reader.GetAccountAtIndex(inst.Accounts[17])
+	i.Minter, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[17]))
 	if err != nil {
 		return nil, err
 	}
-	i.CoinMint, err = reader.GetAccountAtIndex(inst.Accounts[8])
+	i.CoinMint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[8]))
 	if err != nil {
 		return nil, err
 	}
-	i.PoolCoinTokenAccount, err = reader.GetAccountAtIndex(inst.Accounts[10])
+	i.PoolCoinTokenAccount, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[10]))
 	if err != nil {
 		return nil, err
 	}
-	i.PcMint, err = reader.GetAccountAtIndex(inst.Accounts[9])
+	i.PcMint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[9]))
 	if err != nil {
 		return nil, err
 	}
-	i.PoolPcTokenAccount, err = reader.GetAccountAtIndex(inst.Accounts[11])
+	i.PoolPcTokenAccount, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[11]))
 	if err != nil {
 		return nil, err
 	}
-	i.LpMint, err = reader.GetAccountAtIndex(inst.Accounts[7])
+	i.LpMint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[7]))
 	if err != nil {
 		return nil, err
 	}
@@ -123,17 +123,17 @@ func PopulateInitialize2(reader *transactions.Reader, flatIndex uint8) (i *Initi
 	return i, nil
 }
 
-func PopulateMonitorStep(reader *transactions.Reader, flatIndex uint8) (m *MonitorStep, err error) {
+func PopulateMonitorStep(reader *transactions.Reader, flatIndex uint8) (m *db_types.RaydiumMonitorStep, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 18) {
 		return nil, fmt.Errorf("accounts length for MonitorStep must be either 17 or 18")
 	}
 
-	m = &MonitorStep{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	m = &db_types.RaydiumMonitorStep{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	m.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[3])
+	m.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[3]))
 	if err != nil {
 		return nil, err
 	}
@@ -150,21 +150,21 @@ func PopulateMonitorStep(reader *transactions.Reader, flatIndex uint8) (m *Monit
 	return m, nil
 }
 
-func PopulateAddLiquidity(reader *transactions.Reader, flatIndex uint8) (a *AddLiquidity, err error) {
+func PopulateAddLiquidity(reader *transactions.Reader, flatIndex uint8) (a *db_types.RaydiumAddLiquidity, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 14) {
 		return nil, fmt.Errorf("accounts length for AddLiquidity must be either 17 or 18")
 	}
 
-	a = &AddLiquidity{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	a = &db_types.RaydiumAddLiquidity{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	a.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[1])
+	a.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[1]))
 	if err != nil {
 		return nil, err
 	}
-	a.Minter, err = reader.GetAccountAtIndex(inst.Accounts[12])
+	a.Minter, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[12]))
 	if err != nil {
 		return nil, err
 	}
@@ -243,21 +243,21 @@ func PopulateAddLiquidity(reader *transactions.Reader, flatIndex uint8) (a *AddL
 	return a, nil
 }
 
-func PopulateRemoveLiquidity(reader *transactions.Reader, flatIndex uint8) (r *RemoveLiquidity, err error) {
+func PopulateRemoveLiquidity(reader *transactions.Reader, flatIndex uint8) (r *db_types.RaydiumRemoveLiquidity, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 22) {
 		return nil, fmt.Errorf("accounts length for RemoveLiquidity must be either 17 or 18")
 	}
 
-	r = &RemoveLiquidity{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	r = &db_types.RaydiumRemoveLiquidity{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	r.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[0])
+	r.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[0]))
 	if err != nil {
 		return nil, err
 	}
-	r.Owner, err = reader.GetAccountAtIndex(inst.Accounts[18])
+	r.Owner, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[18]))
 	if err != nil {
 		return nil, err
 	}
@@ -304,21 +304,21 @@ func PopulateRemoveLiquidity(reader *transactions.Reader, flatIndex uint8) (r *R
 	return r, nil
 }
 
-func PopulateWithdrawPnl(reader *transactions.Reader, flatIndex uint8) (w *WithdrawPnl, err error) {
+func PopulateWithdrawPnl(reader *transactions.Reader, flatIndex uint8) (w *db_types.RaydiumWithdrawPnl, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 17) {
 		return nil, fmt.Errorf("accounts length for WithdrawPnl must be either 17 or 18")
 	}
 
-	w = &WithdrawPnl{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	w = &db_types.RaydiumWithdrawPnl{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	w.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[1])
+	w.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[1]))
 	if err != nil {
 		return nil, err
 	}
-	w.Owner, err = reader.GetAccountAtIndex(inst.Accounts[9])
+	w.Owner, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[9]))
 	if err != nil {
 		return nil, err
 	}
@@ -363,23 +363,23 @@ func PopulateWithdrawPnl(reader *transactions.Reader, flatIndex uint8) (w *Withd
 	return w, nil
 }
 
-func PopulateSwapExactAmountIn(reader *transactions.Reader, flatIndex uint8) (s *Swap, err error) {
+func PopulateSwapExactAmountIn(reader *transactions.Reader, flatIndex uint8) (s *db_types.RaydiumSwap, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 17 || accountsLen == 18) {
 		return nil, fmt.Errorf("accounts length for SwapExactAmountIn must be either 17 or 18")
 	}
 
-	s = &Swap{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	s = &db_types.RaydiumSwap{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
 
 	offset := accountsLen - 17
-	s.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[1])
+	s.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[1]))
 	if err != nil {
 		return nil, err
 	}
-	s.Maker, err = reader.GetAccountAtIndex(inst.Accounts[16+offset])
+	s.Maker, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[16+offset]))
 	if err != nil {
 		return nil, err
 	}
@@ -439,23 +439,23 @@ func PopulateSwapExactAmountIn(reader *transactions.Reader, flatIndex uint8) (s 
 	return s, nil
 }
 
-func PopulateSwapExactAmountOut(reader *transactions.Reader, flatIndex uint8) (s *Swap, err error) {
+func PopulateSwapExactAmountOut(reader *transactions.Reader, flatIndex uint8) (s *db_types.RaydiumSwap, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	accountsLen := len(inst.Accounts)
 	if !(accountsLen == 17 || accountsLen == 18) {
 		return nil, fmt.Errorf("accounts length for SwapExactAmountOut must be either 17 or 18")
 	}
 
-	s = &Swap{
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+	s = &db_types.RaydiumSwap{
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
 
 	offset := accountsLen - 17
-	s.PoolIdentifier, err = reader.GetAccountAtIndex(inst.Accounts[1])
+	s.PoolIdentifier, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[1]))
 	if err != nil {
 		return nil, err
 	}
-	s.Maker, err = reader.GetAccountAtIndex(inst.Accounts[16+offset])
+	s.Maker, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[16+offset]))
 	if err != nil {
 		return nil, err
 	}
@@ -513,14 +513,4 @@ func PopulateSwapExactAmountOut(reader *transactions.Reader, flatIndex uint8) (s
 	}
 
 	return s, nil
-}
-
-func populateMetadata(reader *transactions.Reader, flatIndex uint8) *indexer.InstructionMetadata {
-	return &indexer.InstructionMetadata{
-		Slot:             reader.GetSlot(),
-		TransactionIndex: reader.GetTransactionIndex(),
-		InstructionIndex: flatIndex,
-		Signature:        reader.GetSignature(),
-		Timestamp:        reader.GetTimestamp(),
-	}
 }

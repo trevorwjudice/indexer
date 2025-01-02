@@ -1,0 +1,11 @@
+TRUNCATE indexer.progress;
+TRUNCATE pump_fun.create;
+TRUNCATE pump_fun.swaps;
+TRUNCATE spl.transfer;
+TRUNCATE spl.burn;
+TRUNCATE spl.initialize_account;
+TRUNCATE spl.associated_token_account_create;
+TRUNCATE raydium_v4.swaps;
+TRUNCATE raydium_v4.add_liquidity;
+TRUNCATE raydium_v4.remove_liquidity;
+TRUNCATE raydium_v4.initialize2;

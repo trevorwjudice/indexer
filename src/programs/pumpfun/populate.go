@@ -2,13 +2,13 @@ package pumpfun
 
 import (
 	"fmt"
-	"indexer/src/indexer"
+	"indexer/src/db/db_types"
 	"indexer/src/util/solana/transactions"
 
 	bin "github.com/gagliardetto/binary"
 )
 
-func PopulateCreate(reader *transactions.Reader, flatIndex uint8) (c *Create, err error) {
+func PopulateCreate(reader *transactions.Reader, flatIndex uint8) (c *db_types.PumpFunCreate, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	if len(inst.Accounts) != 12 && len(inst.Accounts) != 14 {
 		return nil, fmt.Errorf("invalid accounts length for pump.fun create transaction for tx: %s", reader.GetSignature().String())
@@ -18,36 +18,36 @@ func PopulateCreate(reader *transactions.Reader, flatIndex uint8) (c *Create, er
 	if err != nil {
 		return nil, err
 	}
-	c = &Create{
+	c = &db_types.PumpFunCreate{
 		Name:                string(createInst.Name),
 		Symbol:              string(createInst.Symbol),
 		MetadataURI:         string(createInst.URI),
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	c.Mint, err = reader.GetAccountAtIndex(inst.Accounts[0])
+	c.Mint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[0]))
 	if err != nil {
 		return nil, err
 	}
-	c.BondingCurve, err = reader.GetAccountAtIndex(inst.Accounts[2])
+	c.BondingCurve, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[2]))
 	if err != nil {
 		return nil, err
 	}
-	c.AssociatedBondingCurve, err = reader.GetAccountAtIndex(inst.Accounts[3])
+	c.AssociatedBondingCurve, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[3]))
 	if err != nil {
 		return nil, err
 	}
-	c.Deployer, err = reader.GetAccountAtIndex(inst.Accounts[7])
+	c.Deployer, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[7]))
 	if err != nil {
 		return nil, err
 	}
-	c.MetadataSlot, err = reader.GetAccountAtIndex(inst.Accounts[6])
+	c.MetadataSlot, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[6]))
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-func PopulateBuy(reader *transactions.Reader, flatIndex uint8) (b *Swap, err error) {
+func PopulateBuy(reader *transactions.Reader, flatIndex uint8) (b *db_types.PumpFunSwap, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	if len(inst.Accounts) != 10 && len(inst.Accounts) != 12 && len(inst.Accounts) != 14 {
 		return nil, fmt.Errorf("invalid accounts length for pump.fun buy transaction for tx: %s", reader.GetSignature().String())
@@ -57,11 +57,11 @@ func PopulateBuy(reader *transactions.Reader, flatIndex uint8) (b *Swap, err err
 	if err != nil {
 		return nil, err
 	}
-	b = &Swap{
+	b = &db_types.PumpFunSwap{
 		TokenAmount:         -int64(buyInst.Amount),
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	b.Mint, err = reader.GetAccountAtIndex(inst.Accounts[2])
+	b.Mint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -69,20 +69,19 @@ func PopulateBuy(reader *transactions.Reader, flatIndex uint8) (b *Swap, err err
 	if err != nil {
 		return nil, err
 	}
-	b.MakerTokenAccount, err = reader.GetAccountAtIndex(inst.Accounts[5])
+	b.MakerTokenAccount, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[5]))
 	if err != nil {
 		return nil, err
 	}
-	b.Maker, err = reader.GetAccountAtIndex(inst.Accounts[6])
+	b.Maker, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[6]))
 	if err != nil {
 		return nil, err
 	}
 
 	tokenPayment, err := reader.FindSolTransfer(func(t *transactions.SolTransfer) bool {
-		return t.FlattenedInstructionIndex > flatIndex && t.Source.Equals(b.Maker) && t.Destination.Equals(bondingCurve)
+		return t.FlattenedInstructionIndex > flatIndex && t.Source.Equals(b.Maker.PublicKey()) && t.Destination.Equals(bondingCurve)
 	})
 	if err != nil {
-		fmt.Println("payment", reader.GetSignature())
 		return nil, err
 	}
 	b.SolAmount = int64(tokenPayment.Amount)
@@ -91,17 +90,16 @@ func PopulateBuy(reader *transactions.Reader, flatIndex uint8) (b *Swap, err err
 		return nil, err
 	}
 	feePayment, err := reader.FindSolTransfer(func(t *transactions.SolTransfer) bool {
-		return t.FlattenedInstructionIndex > tokenPayment.FlattenedInstructionIndex && t.Source.Equals(b.Maker) && t.Destination.Equals(feeAccount)
+		return t.FlattenedInstructionIndex > tokenPayment.FlattenedInstructionIndex && t.Source.Equals(b.Maker.PublicKey()) && t.Destination.Equals(feeAccount)
 	})
 	if err != nil {
-		fmt.Println("fee", reader.GetSignature())
 		return nil, err
 	}
 	b.Fee = feePayment.Amount
 	return b, nil
 }
 
-func PopulateSell(reader *transactions.Reader, flatIndex uint8) (s *Swap, err error) {
+func PopulateSell(reader *transactions.Reader, flatIndex uint8) (s *db_types.PumpFunSwap, err error) {
 	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
 	if len(inst.Accounts) != 10 && len(inst.Accounts) != 12 {
 		return nil, fmt.Errorf("invalid accounts length for pump.fun sell transaction for tx: %s", reader.GetSignature().String())
@@ -111,19 +109,19 @@ func PopulateSell(reader *transactions.Reader, flatIndex uint8) (s *Swap, err er
 	if err != nil {
 		return nil, err
 	}
-	s = &Swap{
+	s = &db_types.PumpFunSwap{
 		TokenAmount:         int64(sellInst.Amount),
-		InstructionMetadata: populateMetadata(reader, flatIndex),
+		InstructionMetadata: db_types.PopulateMetadata(reader, flatIndex),
 	}
-	s.Mint, err = reader.GetAccountAtIndex(inst.Accounts[2])
+	s.Mint, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[2]))
 	if err != nil {
 		return nil, err
 	}
-	s.MakerTokenAccount, err = reader.GetAccountAtIndex(inst.Accounts[5])
+	s.MakerTokenAccount, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[5]))
 	if err != nil {
 		return nil, err
 	}
-	s.Maker, err = reader.GetAccountAtIndex(inst.Accounts[6])
+	s.Maker, err = db_types.ToPublicKeyErr(reader.GetAccountAtIndex(inst.Accounts[6]))
 	if err != nil {
 		return nil, err
 	}
@@ -145,12 +143,20 @@ func PopulateSell(reader *transactions.Reader, flatIndex uint8) (s *Swap, err er
 	return s, nil
 }
 
-func populateMetadata(reader *transactions.Reader, flatIndex uint8) *indexer.InstructionMetadata {
-	return &indexer.InstructionMetadata{
-		Slot:             reader.GetSlot(),
-		TransactionIndex: reader.GetTransactionIndex(),
-		InstructionIndex: flatIndex,
-		Signature:        reader.GetSignature(),
-		Timestamp:        reader.GetTimestamp(),
+func PopulateSetParams(reader *transactions.Reader, flatIndex uint8) (s *db_types.PumpFunSetParams, err error) {
+	inst, _ := reader.GetInstructionAtFlattenedIndex(flatIndex)
+	setParamsInst := &InstructionSetParams{}
+	err = bin.NewDecoderWithEncoding(inst.Data, bin.EncodingBorsh).Decode(setParamsInst)
+	if err != nil {
+		return nil, err
 	}
+	return &db_types.PumpFunSetParams{
+		FeeRecipient:                db_types.PublicKey(setParamsInst.FeeRecipient),
+		InitialVirtualTokenReserves: setParamsInst.InitialVirtualTokenReserves,
+		InitialVirtualSolReserves:   setParamsInst.InitialVirtualSolReserves,
+		InitialRealTokenReserves:    setParamsInst.InitialRealTokenReserves,
+		TokenTotalSupply:            setParamsInst.TokenTotalSupply,
+		FeeBasisPoints:              setParamsInst.FeeBasisPoints,
+		InstructionMetadata:         db_types.PopulateMetadata(reader, flatIndex),
+	}, nil
 }

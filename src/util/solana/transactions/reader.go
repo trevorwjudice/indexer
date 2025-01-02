@@ -3,7 +3,6 @@ package transactions
 import (
 	"errors"
 	"fmt"
-	"indexer/src/util/solana/logparse"
 	"strconv"
 	"time"
 
@@ -192,10 +191,6 @@ func (r *Reader) GetInstructionAccounts(inst solana.CompiledInstruction) ([]*sol
 	return inst.ResolveInstructionAccounts(&r.parsed.Message)
 }
 
-func (r *Reader) GetParsedLogs() ([]logparse.Log, error) {
-	return logparse.ParseLogs(r.tx.Meta.LogMessages)
-}
-
 type TokenTransfer struct {
 	FlattenedInstructionIndex uint8
 	Amount                    uint64
@@ -224,7 +219,7 @@ func (r *Reader) FindTransfer(fn func(t *TokenTransfer) bool) (*TokenTransfer, e
 			return transfer, nil
 		}
 	}
-
+	fmt.Println(r.GetSignature())
 	return nil, fmt.Errorf("transfer not found")
 }
 
@@ -296,6 +291,19 @@ func (r *Reader) getTokenTransfers() ([]*TokenTransfer, error) {
 	}
 
 	return res, nil
+}
+
+func (r *Reader) GetAccountMeta(inst solana.CompiledInstruction) ([]*solana.AccountMeta, error) {
+	accounts, err := r.GetAccountsAtIndices(inst.Accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	accountMeta := make([]*solana.AccountMeta, 0, len(accounts))
+	for _, acc := range accounts {
+		accountMeta = append(accountMeta, &solana.AccountMeta{PublicKey: acc})
+	}
+	return accountMeta, nil
 }
 
 type SolTransfer struct {
@@ -384,4 +392,26 @@ func (r *Reader) GetSolBalanceDelta(accountIndex uint16) (int64, error) {
 	preBalance := int64(r.tx.Meta.PreBalances[accountIndex])
 	postBalance := int64(r.tx.Meta.PostBalances[accountIndex])
 	return postBalance - preBalance, nil
+}
+
+func (r *Reader) FindTransferMintAddress(source, destination solana.PublicKey) (s solana.PublicKey, err error) {
+	for _, delta := range r.tx.Meta.PreTokenBalances {
+		acc, err := r.GetAccountAtIndex(delta.AccountIndex)
+		if err != nil {
+			return s, err
+		}
+		if acc.Equals(source) || acc.Equals(destination) {
+			return delta.Mint, nil
+		}
+	}
+	for _, delta := range r.tx.Meta.PostTokenBalances {
+		acc, err := r.GetAccountAtIndex(delta.AccountIndex)
+		if err != nil {
+			return s, err
+		}
+		if acc.Equals(source) || acc.Equals(destination) {
+			return delta.Mint, nil
+		}
+	}
+	return s, fmt.Errorf("mint not found for accounts: %s %s for tx: %s", source, destination, r.GetSignature())
 }

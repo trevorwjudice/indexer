@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"indexer/src/db_types"
+	"indexer/src/db/db_types"
+	"indexer/src/indexer/keycache"
+	"indexer/src/indexer/parser"
 	"indexer/src/util/dbutil"
-	"indexer/src/util/solana/transactions"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -19,21 +20,17 @@ import (
 var SLOT_GROUP_SIZE uint64 = 1000
 
 type Indexer struct {
-	cl      *rpc.Client
-	s       db.Session
-	parsers []InstructionParser
+	cl *rpc.Client
+	s  db.Session
+	p  *parser.InstructionParser
 }
 
-func NewIndexer(cl *rpc.Client, s db.Session) *Indexer {
-	return &Indexer{cl: cl, s: s}
+func NewIndexer(cl *rpc.Client, s db.Session, fetch keycache.FetchFunc) *Indexer {
+	return &Indexer{cl: cl, s: s, p: parser.New(fetch)}
 }
 
-func (i *Indexer) AddProgramParser(parser InstructionParser) {
-	i.parsers = append(i.parsers, parser)
-}
-
-func (i *Indexer) GetBackendBlockHeight(ctx context.Context) (uint64, error) {
-	return 0, nil
+func (i *Indexer) AddParser(id solana.PublicKey, fn parser.ProgramParseFunc) {
+	i.p.SetProgramParseFunc(id, fn)
 }
 
 func (i *Indexer) Run(ctx context.Context) error {
@@ -100,120 +97,61 @@ func (i *Indexer) ScheduleRange(ctx context.Context, startSlot, endSlot uint64) 
 }
 
 func (i *Indexer) doTask(ctx context.Context, t *db_types.Progress) error {
-
 	ts := time.Now()
 	blocks, err := i.getValidBlocksBetween(ctx, t.SlotStart, t.SlotEnd)
 	if err != nil {
 		return err
 	}
 
+	s, err := i.p.NewSession(ctx, i.s)
+	if err != nil {
+		return err
+	}
+
 	wg := errgroup.Group{}
 	wg.SetLimit(250)
-	results := make([]*BlockResult, len(blocks))
-	for ind, slot := range blocks {
-		ind := ind
+	failCount := 0
+	for _, slot := range blocks {
 		slot := slot
 		wg.Go(func() (err error) {
-			ts := time.Now()
 			for {
-				results[ind], err = i.GetSlot(ctx, slot)
+				blk, err := i.cl.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
+					MaxSupportedTransactionVersion: rpc.NewTransactionVersion(0),
+					Commitment:                     rpc.CommitmentFinalized,
+				})
 				if err != nil {
+					failCount += 1
 					fmt.Printf("error getting slot %d: %s\n", slot, err.Error())
 					continue
 				}
+				err = s.ParseSlot(blk, slot)
+				if err != nil {
+					panic(err)
+					return err
+				}
 				break
 			}
-			fmt.Println(time.Since(ts))
 			return nil
 		})
 	}
-
 	if err := wg.Wait(); err != nil {
 		return err
 	}
 
-	// upload blocks
-
-	inserter := NewProgramInstructionInserter()
-
-	for _, blk := range results {
-		for _, inst := range blk.ParsedInstructions {
-			inserter.Add(inst)
-		}
+	if failCount > 1000 {
+		panic("fail count exceeded")
 	}
 
-	return i.s.TxContext(ctx, func(s db.Session) error {
-		err := inserter.Execute(ctx, s)
+	return i.s.TxContext(ctx, func(d db.Session) error {
+		err := s.Execute(ctx, d)
 		if err != nil {
 			return err
 		}
-
 		t.BlockCount = int64(len(blocks))
 		t.Status = 1
 		t.TimeTaken = int64(time.Since(ts).Seconds())
-		return i.finishTask(s, t)
+		return i.finishTask(d, t)
 	}, nil)
-}
-
-type BlockResult struct {
-	ParsedInstructions []ParsedInstruction
-}
-
-type TransactionInfo struct {
-	Tx       *rpc.TransactionWithMeta
-	Parsed   *solana.Transaction
-	Accounts []solana.PublicKey
-}
-
-func (i *Indexer) GetSlot(ctx context.Context, slot uint64) (*BlockResult, error) {
-	u := uint64(0)
-	blk, err := i.cl.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
-		MaxSupportedTransactionVersion: &u,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := &BlockResult{}
-	for ind, tx := range blk.Transactions {
-		if tx.Meta.Err != nil {
-			// Possibly record failed TX in the future? Might be useful
-			continue
-		}
-
-		parsedInstructions, err := i.ParseTransaction(blk, slot, ind)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, inst := range parsedInstructions {
-			if inst != nil {
-				res.ParsedInstructions = append(res.ParsedInstructions, inst)
-
-			}
-		}
-	}
-
-	return res, nil
-}
-
-func (i *Indexer) ParseTransaction(blk *rpc.GetBlockResult, slot uint64, txIndex int) ([]ParsedInstruction, error) {
-	var res []ParsedInstruction
-
-	for _, parser := range i.parsers {
-		reader, err := transactions.NewReader(blk, slot, txIndex)
-		if err != nil {
-			return nil, err
-		}
-		parsedInstructions, err := parser.ParseTransaction(reader)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, parsedInstructions...)
-	}
-
-	return res, nil
 }
 
 var ErrorZeroSlotsBetween error = errors.New("valid slot length is zero")
@@ -222,7 +160,7 @@ const MAX_RETRY_COUNT = 100
 
 func (i *Indexer) getValidBlocksBetween(ctx context.Context, slotStart, slotEnd uint64) ([]uint64, error) {
 	retryCount := 1
-	validBlocks, err := i.cl.GetBlocks(ctx, slotStart, &slotEnd, rpc.CommitmentConfirmed)
+	validBlocks, err := i.cl.GetBlocks(ctx, slotStart, &slotEnd, rpc.CommitmentFinalized)
 	for err != nil {
 		log.Err(err).Uint64("slot_start", slotStart).Uint64("slot_end", slotEnd).Msg("error getting blocks")
 		if retryCount == MAX_RETRY_COUNT {

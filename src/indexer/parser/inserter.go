@@ -1,7 +1,8 @@
-package indexer
+package parser
 
 import (
 	"context"
+	"indexer/src/db/db_types"
 	"indexer/src/util/dbutil"
 
 	"github.com/upper/db/v4"
@@ -9,15 +10,15 @@ import (
 
 type Inserter interface {
 	Execute(ctx context.Context, s db.Session) error
-	Add(inst ParsedInstruction)
+	Add(inst db_types.ParsedInstruction)
 }
 
 type ProgramInstructionSorter struct {
-	instTable map[string][]ParsedInstruction
+	instTable map[string][]db_types.ParsedInstruction
 }
 
 func NewProgramInstructionInserter() Inserter {
-	return &ProgramInstructionSorter{instTable: make(map[string][]ParsedInstruction)}
+	return &ProgramInstructionSorter{instTable: make(map[string][]db_types.ParsedInstruction)}
 }
 
 func (p *ProgramInstructionSorter) Execute(ctx context.Context, s db.Session) error {
@@ -30,6 +31,6 @@ func (p *ProgramInstructionSorter) Execute(ctx context.Context, s db.Session) er
 	return nil
 }
 
-func (p *ProgramInstructionSorter) Add(inst ParsedInstruction) {
+func (p *ProgramInstructionSorter) Add(inst db_types.ParsedInstruction) {
 	p.instTable[inst.Table()] = append(p.instTable[inst.Table()], inst)
 }
