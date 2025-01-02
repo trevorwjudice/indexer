@@ -58,3 +58,15 @@ func (s *PumpFunSetParams) Table() string {
 func (c *PumpFunSetParams) Filter(k *keycache.Keycache) bool {
 	return true
 }
+
+type PumpFunWithdraw struct {
+	*InstructionMetadata
+}
+
+func (s *PumpFunWithdraw) Table() string {
+	return PUMP_FUN_WITHDRAW
+}
+
+func (c *PumpFunWithdraw) Filter(k *keycache.Keycache) bool {
+	return true
+}

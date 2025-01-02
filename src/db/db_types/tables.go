@@ -13,6 +13,7 @@ var (
 	PUMP_FUN_CREATE     = "pump_fun.create"
 	PUMP_FUN_SWAPS      = "pump_fun.swaps"
 	PUMP_FUN_SET_PARAMS = "pump_fun.set_params"
+	PUMP_FUN_WITHDRAW   = "pump_fun.withdraw"
 
 	SPL_TRANSFER                        = "spl.transfer"
 	SPL_INITIALIZE_ACCOUNT              = "spl.initialize_account"

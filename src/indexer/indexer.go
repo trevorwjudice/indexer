@@ -109,7 +109,7 @@ func (i *Indexer) doTask(ctx context.Context, t *db_types.Progress) error {
 	}
 
 	wg := errgroup.Group{}
-	wg.SetLimit(250)
+	wg.SetLimit(200)
 	failCount := 0
 	for _, slot := range blocks {
 		slot := slot
@@ -126,7 +126,6 @@ func (i *Indexer) doTask(ctx context.Context, t *db_types.Progress) error {
 				}
 				err = s.ParseSlot(blk, slot)
 				if err != nil {
-					panic(err)
 					return err
 				}
 				break
@@ -139,7 +138,7 @@ func (i *Indexer) doTask(ctx context.Context, t *db_types.Progress) error {
 	}
 
 	if failCount > 1000 {
-		panic("fail count exceeded")
+		return fmt.Errorf("fail count exceeded")
 	}
 
 	return i.s.TxContext(ctx, func(d db.Session) error {
@@ -166,7 +165,7 @@ func (i *Indexer) getValidBlocksBetween(ctx context.Context, slotStart, slotEnd 
 		if retryCount == MAX_RETRY_COUNT {
 			return nil, fmt.Errorf("retry count exceeded")
 		}
-		validBlocks, err = i.cl.GetBlocks(ctx, slotStart, &slotEnd, rpc.CommitmentConfirmed)
+		validBlocks, err = i.cl.GetBlocks(ctx, slotStart, &slotEnd, rpc.CommitmentFinalized)
 		if len(validBlocks) == 0 {
 			err = ErrorZeroSlotsBetween
 		}
